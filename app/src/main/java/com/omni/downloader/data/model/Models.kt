@@ -86,6 +86,11 @@ data class DownloadTask(
     val thumbnailUrl: String = "",
     val downloadType: DownloadType,
     val selectedResolution: String = "", // 如 "1080p"
+    // 解析阶段选中的精确 format_id。视频网站的对角线分辨率常不是标准值（竖屏 720p 实际高 816），
+    // 只靠 height<=720 这类近似条件会错误退档，因此优先按 id 精确选流。
+    val selectedFormatId: String = "",
+    // 该 format 是否只含画面；为 true 时需要再合并一条音轨，进度也要分两段显示。
+    val selectedVideoOnly: Boolean = false,
     val audioFormat: AudioFormat = AudioFormat.MP3,
     val status: TaskStatus = TaskStatus.PENDING,
     val progress: Float = 0f, // 0.0 - 100.0

@@ -297,6 +297,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             thumbnailUrl = currentMeta.thumbnailUrl,
             downloadType = type,
             selectedResolution = resolutionLabel,
+            selectedFormatId = format?.formatId.orEmpty(),
+            selectedVideoOnly = format?.isVideoOnly ?: false,
             audioFormat = audioFormat,
             directMediaUrl = DomesticMediaSource.url(currentMeta, format),
             directMediaHeaders = DomesticMediaSource.headers(currentMeta.siteName)
@@ -447,6 +449,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 thumbnailUrl = sub.thumbnailUrl.ifBlank { meta.thumbnailUrl },
                 downloadType = finalType,
                 selectedResolution = resolutionLabel,
+                selectedFormatId = format?.formatId.orEmpty(),
+                selectedVideoOnly = format?.isVideoOnly ?: false,
                 audioFormat = audioFormat,
                 collectionId = collectionId,
                 collectionTitle = if (isCollection) collectionTitle else null,

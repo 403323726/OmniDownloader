@@ -511,7 +511,7 @@ object DownloadEngine {
                 addOption("--no-mtime")
                 addOption("--retries", "10")
                 addOption("--fragment-retries", "10")
-                addOption("--concurrent-fragments", "1")
+                addOption("--concurrent-fragments", "4")
                 addOption("--windows-filenames")
                 addOption("--restrict-filenames")
                 addOption("--no-part")
@@ -562,21 +562,11 @@ object DownloadEngine {
 
                 when (task.downloadType) {
                     DownloadType.VIDEO_WITH_AUDIO -> {
-                        val h = extractHeightFromResolution(task.selectedResolution)
-                        if (h > 0) {
-                            addOption("-f", "bestvideo[height<=$h]+bestaudio/best[height<=$h]/best")
-                        } else {
-                            addOption("-f", "bestvideo+bestaudio/best")
-                        }
+                        addOption("-f", buildVideoWithAudioSelector(task))
                         addOption("--merge-output-format", "mp4")
                     }
                     DownloadType.VIDEO_ONLY -> {
-                        val h = extractHeightFromResolution(task.selectedResolution)
-                        if (h > 0) {
-                            addOption("-f", "bestvideo[height<=$h]/best[height<=$h]")
-                        } else {
-                            addOption("-f", "bestvideo/best")
-                        }
+                        addOption("-f", buildVideoOnlySelector(task))
                         addOption("--postprocessor-args", "ffmpeg:-an")
                     }
                     DownloadType.AUDIO_ONLY -> {
@@ -599,22 +589,42 @@ object DownloadEngine {
             onProgressUpdate(0f, "", "准备下载...", TaskStatus.DOWNLOADING)
 
             var lastReportedPath = ""
+            // yt-dlp 会为每条流单独打印 Destination；本任务是否要额外合并音轨在解析阶段就已确定
+            var streamCount = 0
+            val expectsSeparateAudio = task.downloadType == DownloadType.VIDEO_WITH_AUDIO && task.selectedVideoOnly
 
             try {
                 YoutubeDL.getInstance().execute(
                     request,
                     task.id
                 ) { progress, etaInSeconds, line ->
-                    val etaStr = if (etaInSeconds > 0) {
-                        val m = etaInSeconds / 60
-                        val s = etaInSeconds % 60
-                        if (m > 0) "${m}分${s}秒" else "${s}秒"
-                    } else ""
+                    if (line.contains("[download] Destination:")) streamCount++
+
+                    val stageProgress = progress.coerceIn(0f, 100f)
+                    // 画面与音轨是两条流：画面走 0→90，音轨走 90→99，
+                    // 避免第二条流开始时进度条从 100% 掉回 0%，看起来像整片重下。
+                    val isAudioStage = streamCount >= 2
+                    val displayProgress = when {
+                        isAudioStage -> 90f + stageProgress * 0.09f
+                        expectsSeparateAudio -> stageProgress * 0.9f
+                        else -> stageProgress
+                    }
 
                     val speed = parseSpeedFromLine(line)
                     val currentStatus = when {
-                        progress >= 99.5f -> TaskStatus.PROCESSING
+                        isAudioStage -> TaskStatus.PROCESSING
+                        stageProgress >= 99.5f -> TaskStatus.PROCESSING
                         else -> TaskStatus.DOWNLOADING
+                    }
+
+                    val etaStr = when {
+                        isAudioStage -> "正在下载音轨"
+                        etaInSeconds > 0 -> {
+                            val m = etaInSeconds / 60
+                            val s = etaInSeconds % 60
+                            if (m > 0) "${m}分${s}秒" else "${s}秒"
+                        }
+                        else -> ""
                     }
 
                     if (line.contains("[download] Destination:") || line.contains("[Merger] Merging formats into")) {
@@ -624,7 +634,7 @@ object DownloadEngine {
                         }
                     }
 
-                    onProgressUpdate(progress, speed, etaStr, currentStatus)
+                    onProgressUpdate(displayProgress, speed, etaStr, currentStatus)
                 }
             } catch (firstEx: Exception) {
                 val rootMsg = getRootCause(firstEx).message ?: firstEx.message ?: ""
@@ -649,7 +659,7 @@ object DownloadEngine {
                         addOption("--windows-filenames")
                         addOption("--restrict-filenames")
                         addOption("--no-part")
-                        addOption("--concurrent-fragments", "1")
+                        addOption("--concurrent-fragments", "4")
                         addOption("-f", "best/bestvideo+bestaudio")
 
                         if (proxyUrl.isNotBlank()) {
@@ -1368,6 +1378,8 @@ object DownloadEngine {
 
         val formatsJson = json.optJSONArray("formats") ?: JSONArray()
         val videoFormatsMap = mutableMapOf<Int, FormatOption>()
+        // 记录每个清晰度当前保存的是否为 HLS 分片流，用于优先保留渐进式 mp4
+        val heightIsHls = mutableMapOf<Int, Boolean>()
         val audioFormatsList = mutableListOf<FormatOption>()
         var hasTwitterRegularVideo = false
         var hasTwitterTweetVideo = false
@@ -1407,6 +1419,7 @@ object DownloadEngine {
                     )
                 )
             } else if (h > 0) {
+                val isHlsStream = formatUrl.contains(".m3u8")
                 val label = when {
                     h >= 2160 -> "4K (2160p)"
                     h >= 1440 -> "2K (1440p)"
@@ -1418,7 +1431,12 @@ object DownloadEngine {
                 }
 
                 val existing = videoFormatsMap[h]
-                if (existing == null || (sizeStr.isNotEmpty() && existing.approximateSize.isEmpty())) {
+                val existingIsHls = heightIsHls[h] ?: false
+                // 同一清晰度若同时提供 HLS 分片与渐进式 mp4，优先渐进式：
+                // 分片流要逐片建连（实测 60~100 KB/s），单连接的 mp4 通常快一个数量级。
+                val preferProgressive = existingIsHls && !isHlsStream
+                val preferSized = !existingIsHls && !isHlsStream && sizeStr.isNotEmpty() && existing?.approximateSize.isNullOrEmpty()
+                if (existing == null || preferProgressive || preferSized) {
                     videoFormatsMap[h] = FormatOption(
                         formatId = f.optString("format_id", h.toString()),
                         resolutionLabel = label,
@@ -1429,6 +1447,7 @@ object DownloadEngine {
                         approximateSize = sizeStr,
                         isVideoOnly = isVideoOnly
                     )
+                    heightIsHls[h] = isHlsStream
                 }
             }
         }
@@ -1508,6 +1527,49 @@ object DownloadEngine {
             cause = cause.cause!!
         }
         return cause
+    }
+
+    /** 内置伪 id：解析失败时的兜底列表，并不是真实的 format_id，不能直接传给 -f。 */
+    private val PSEUDO_FORMAT_IDS = setOf("best", "2160", "1440", "1080", "720", "480", "gif", "audio")
+
+    /**
+     * 取出可用于 -f 的精确 format_id。
+     * 含 / 、逗号、方括号或空格的 id 会破坏选择器语法，这种情况返回 null 让调用方走兜底链路。
+     */
+    internal fun exactFormatId(task: DownloadTask): String? {
+        val id = task.selectedFormatId.trim()
+        if (id.isEmpty() || id.lowercase(Locale.ROOT) in PSEUDO_FORMAT_IDS) return null
+        if (id.any { it == '/' || it == ',' || it == '[' || it == ']' || it.isWhitespace() }) return null
+        return id
+    }
+
+    /**
+     * 音画合流的 -f 选择器。
+     *
+     * 首选解析阶段选中的精确 format_id：各站点的“720p”不一定等于 height=720
+     * （例如竖屏视频的 720p 实际高度是 816），按 height<=720 过滤会静默降到更低档位。
+     * 后面的兜底链路保证即使 id 失效也仍能下到东西。
+     */
+    internal fun buildVideoWithAudioSelector(task: DownloadTask): String {
+        val h = extractHeightFromResolution(task.selectedResolution)
+        val byHeight = if (h > 0) "bestvideo[height<=$h]+bestaudio/best[height<=$h]" else "bestvideo+bestaudio"
+        val muxedFallback = if (h > 0) "best[height<=$h]" else "best"
+        val id = exactFormatId(task) ?: return "$byHeight/$muxedFallback/best"
+        return if (task.selectedVideoOnly) {
+            // 纯画面格式：必须再合并一条音轨；失败则退回按高度挑的组合
+            "$id+bestaudio/$byHeight/$muxedFallback/best"
+        } else {
+            // 已含音轨的成品格式：直接取用，不再额外拼接音轨
+            "$id/$muxedFallback/best"
+        }
+    }
+
+    /** 纯画面下载的 -f 选择器，同样优先按精确 id 取流。 */
+    internal fun buildVideoOnlySelector(task: DownloadTask): String {
+        val h = extractHeightFromResolution(task.selectedResolution)
+        val byHeight = if (h > 0) "bestvideo[height<=$h]/best[height<=$h]" else "bestvideo/best"
+        val id = exactFormatId(task) ?: return "$byHeight/best"
+        return "$id/$byHeight/best"
     }
 
     private fun extractHeightFromResolution(resolutionLabel: String): Int {

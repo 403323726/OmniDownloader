@@ -505,16 +505,18 @@ private fun TaskDownloadingProgressSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            val isProcessing = liveProgress.status == TaskStatus.PROCESSING
             Text(
-                text = if (liveProgress.status == TaskStatus.PROCESSING) {
-                    "正在合并音视频轨..."
+                // 处理阶段的说明文字由进度回调给出（音轨下载 / 合并封装），缺省回落到合并提示
+                text = if (isProcessing) {
+                    liveProgress.etaText.ifBlank { "正在合并音视频轨..." }
                 } else {
                     "${liveProgress.progress.toInt()}% · ${liveProgress.speedText}"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (liveProgress.etaText.isNotEmpty()) {
+            if (!isProcessing && liveProgress.etaText.isNotEmpty()) {
                 Text(
                     text = "剩余 ${liveProgress.etaText}",
                     style = MaterialTheme.typography.bodySmall,
