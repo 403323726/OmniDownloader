@@ -88,6 +88,26 @@ class TaskRepositoryTest {
         assertFalse(java.io.File(file.path + ".tmp").exists())
     }
 
+    @Test fun deletingOneDuplicateKeepsSharedLocalFile() = runTest {
+        val media = folder.newFile()
+        val repo = TaskRepository(folder.newFile(), backgroundScope)
+        runCurrent()
+        repo.addTasks(listOf(
+            task("a", TaskStatus.COMPLETED).copy(localFilePath = media.path),
+            task("b", TaskStatus.COMPLETED).copy(localFilePath = media.path)
+        ))
+        repo.removeTask("a", deleteLocalFile = true)
+        runCurrent()
+        assertEquals(1, repo.tasks.value.size)
+        assertEquals("b", repo.tasks.value.first().id)
+        assertTrue("仍被其他任务引用的文件不能删", media.exists())
+        // 最后一个引用被删除后，文件才应随之清理
+        repo.removeTask("b", deleteLocalFile = true)
+        runCurrent()
+        assertTrue(repo.tasks.value.isEmpty())
+        assertFalse(media.exists())
+    }
+
     @Test fun localFileDeletionRunsInRepositoryScope() = runTest {
         val media = folder.newFile()
         val repo = TaskRepository(folder.newFile(), backgroundScope)

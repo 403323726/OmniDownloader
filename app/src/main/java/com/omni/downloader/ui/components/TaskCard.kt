@@ -88,6 +88,8 @@ fun TaskCard(
 ) {
     val context = LocalContext.current
     val strings = LocalAppStrings.current
+    // 删除前二次确认，避免误触把记录和文件一起删掉
+    var pendingDelete by remember { mutableStateOf(false) }
     val statusColors = LocalStatusColors.current
     val isGifTask = task.downloadType == DownloadType.GIF || task.localFilePath.endsWith(".gif", ignoreCase = true)
     var showGifPreviewDialog by remember { mutableStateOf(false) }
@@ -231,7 +233,7 @@ fun TaskCard(
                         TaskIconBtn(
                             icon = Icons.Outlined.Delete,
                             contentDescription = strings.delete,
-                            onClick = { onDelete(task.id, true) }
+                            onClick = { pendingDelete = true }
                         )
                     }
 
@@ -246,12 +248,45 @@ fun TaskCard(
                         TaskIconBtn(
                             icon = Icons.Outlined.Delete,
                             contentDescription = strings.delete,
-                            onClick = { onDelete(task.id, false) }
+                            onClick = { pendingDelete = true }
                         )
                     }
                 }
             }
         }
+    }
+
+    if (pendingDelete) {
+        val removesFile = task.status == TaskStatus.COMPLETED
+        AlertDialog(
+            onDismissRequest = { pendingDelete = false },
+            title = {
+                Text(
+                    text = strings.deleteTaskDialogTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (removesFile) strings.deleteTaskDialogMessage else strings.deleteTaskDialogMessageNoFile,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDelete = false
+                    onDelete(task.id, removesFile)
+                }) {
+                    Text(strings.delete, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = false }) {
+                    Text(strings.cancel)
+                }
+            }
+        )
     }
 
     // 应用内原生无缝动图无限循环播放弹窗

@@ -591,6 +591,8 @@ object DownloadEngine {
             var lastReportedPath = ""
             // yt-dlp 会为每条流单独打印 Destination；本任务是否要额外合并音轨在解析阶段就已确定
             var streamCount = 0
+            var sawMerge = false
+            var maxReportedProgress = 0f
             val expectsSeparateAudio = task.downloadType == DownloadType.VIDEO_WITH_AUDIO && task.selectedVideoOnly
 
             try {
@@ -599,16 +601,20 @@ object DownloadEngine {
                     task.id
                 ) { progress, etaInSeconds, line ->
                     if (line.contains("[download] Destination:")) streamCount++
+                    if (line.contains("[Merger]")) sawMerge = true
 
                     val stageProgress = progress.coerceIn(0f, 100f)
                     // 画面与音轨是两条流：画面走 0→90，音轨走 90→99，
                     // 避免第二条流开始时进度条从 100% 掉回 0%，看起来像整片重下。
                     val isAudioStage = streamCount >= 2
-                    val displayProgress = when {
+                    val rawProgress = when {
                         isAudioStage -> 90f + stageProgress * 0.09f
                         expectsSeparateAudio -> stageProgress * 0.9f
                         else -> stageProgress
                     }
+                    // 合并阶段 yt-dlp 可能回报 0%，进度条只前进不后退
+                    val displayProgress = maxOf(rawProgress, maxReportedProgress).coerceIn(0f, 100f)
+                    maxReportedProgress = displayProgress
 
                     val speed = parseSpeedFromLine(line)
                     val currentStatus = when {
@@ -617,11 +623,11 @@ object DownloadEngine {
                         else -> TaskStatus.DOWNLOADING
                     }
 
-                    // 处理阶段（合并/封装）的文案由 UI 用自身默认文案补位，
-                    // 这里必须留空，否则「剩余 1秒」会把「正在合并音视频轨…」顶掉。
+                    // 处理阶段分两种文案：真正在合并音视频轨，还是仅封装/搬运文件
                     val etaStr = when {
                         isAudioStage -> "正在下载音轨"
-                        currentStatus == TaskStatus.PROCESSING -> ""
+                        currentStatus == TaskStatus.PROCESSING ->
+                            if (sawMerge) "正在合并音视频轨…" else "正在保存文件…"
                         etaInSeconds > 0 -> {
                             val m = etaInSeconds / 60
                             val s = etaInSeconds % 60

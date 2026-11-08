@@ -44,6 +44,9 @@ data class AppStrings(
     val play: String,
     val retry: String,
     val delete: String,
+    val deleteTaskDialogTitle: String,
+    val deleteTaskDialogMessage: String,
+    val deleteTaskDialogMessageNoFile: String,
     val cancel: String,
 
     // 分类设置与子页面
@@ -297,6 +300,9 @@ val ZhHansStrings = AppStrings(
     play = "播放",
     retry = "重试",
     delete = "删除",
+    deleteTaskDialogTitle = "删除下载记录",
+    deleteTaskDialogMessage = "将删除这条记录及其本地文件；若其他任务仍引用同一个文件，文件会保留。是否继续？",
+    deleteTaskDialogMessageNoFile = "确定要移除这条下载记录吗？本地文件不会被删除。",
     cancel = "取消",
 
     settingsTitle = "偏好设置",
@@ -523,6 +529,9 @@ val ZhHantStrings = AppStrings(
     play = "播放",
     retry = "重試",
     delete = "刪除",
+    deleteTaskDialogTitle = "刪除下載記錄",
+    deleteTaskDialogMessage = "將刪除這條記錄及其本機檔案；若其他任務仍引用同一個檔案，檔案會保留。是否繼續？",
+    deleteTaskDialogMessageNoFile = "確定要移除這條下載記錄嗎？本機檔案不會被刪除。",
     cancel = "取消",
 
     settingsTitle = "偏好設定",
@@ -749,6 +758,9 @@ val EnStrings = AppStrings(
     play = "Play",
     retry = "Retry",
     delete = "Delete",
+    deleteTaskDialogTitle = "Delete download record",
+    deleteTaskDialogMessage = "This removes the record and its local file. If another task still uses the same file, it is kept. Continue?",
+    deleteTaskDialogMessageNoFile = "Remove this download record? The local file will not be deleted.",
     cancel = "Cancel",
 
     settingsTitle = "Settings",
@@ -975,6 +987,9 @@ val JaStrings = AppStrings(
     play = "再生",
     retry = "再試行",
     delete = "削除",
+    deleteTaskDialogTitle = "ダウンロード記録を削除",
+    deleteTaskDialogMessage = "この記録とローカルファイルを削除します。他のタスクが同じファイルを使っている場合はファイルを残します。続行しますか？",
+    deleteTaskDialogMessageNoFile = "この記録を削除しますか？ローカルファイルは削除されません。",
     cancel = "キャンセル",
 
     settingsTitle = "環境設定",

@@ -184,7 +184,13 @@ class TaskRepository internal constructor(
             count = removed.size
             removed.forEach { map.remove(it.id) }
             if (deleteLocalFiles) {
-                val paths = removed.map { it.localFilePath }.filter { it.isNotEmpty() }
+                // 同一条视频重复下载会落到同一个输出文件上。删除单条任务时，
+                // 只要还有其他任务引用这个路径，就必须保留文件，否则会把别的记录一起『删没』。
+                val stillReferenced = map.values.mapNotNull { it.localFilePath.takeIf { p -> p.isNotEmpty() } }.toSet()
+                val paths = removed
+                    .mapNotNull { it.localFilePath.takeIf { p -> p.isNotEmpty() } }
+                    .filter { it !in stillReferenced }
+                    .distinct()
                 repositoryScope.launch { paths.forEach { path ->
                     try { File(path).delete() } catch (e: Exception) { e.printStackTrace() }
                 } }
