@@ -30,6 +30,9 @@ class SettingsRepository private constructor(context: Context) {
     private val _bilibiliCookie = MutableStateFlow(prefs.getString(KEY_BILIBILI_COOKIE, "") ?: "")
     val bilibiliCookie: StateFlow<String> = _bilibiliCookie.asStateFlow()
 
+    private val _xCookie = MutableStateFlow(prefs.getString(KEY_X_COOKIE, "") ?: "")
+    val xCookie: StateFlow<String> = _xCookie.asStateFlow()
+
     private val _hasPromptedBilibiliLogin = MutableStateFlow(prefs.getBoolean(KEY_HAS_PROMPTED_BILIBILI_LOGIN, false))
     val hasPromptedBilibiliLogin: StateFlow<Boolean> = _hasPromptedBilibiliLogin.asStateFlow()
 
@@ -122,6 +125,23 @@ class SettingsRepository private constructor(context: Context) {
         com.omni.downloader.engine.BilibiliDirectExtractor.customUserCookie = ""
     }
 
+    /**
+     * 保存 X (Twitter) 登录凭证。传入的可以是完整 Cookie 字符串，
+     * 也可以只包含 auth_token=xxx; ct0=xxx。
+     */
+    fun setXCookie(cookie: String) {
+        val clean = cookie.trim()
+        _xCookie.value = clean
+        prefs.edit().putString(KEY_X_COOKIE, clean).apply()
+        com.omni.downloader.engine.XCookieSupport.invalidate()
+    }
+
+    fun clearXCookie() {
+        _xCookie.value = ""
+        prefs.edit().remove(KEY_X_COOKIE).apply()
+        com.omni.downloader.engine.XCookieSupport.invalidate()
+    }
+
     fun setProxyUrl(url: String) {
         val clean = url.trim()
         _proxyUrl.value = clean
@@ -194,6 +214,7 @@ class SettingsRepository private constructor(context: Context) {
         private const val KEY_PROXY_URL = "key_proxy_url"
         private const val KEY_DOWNLOAD_PATH = "key_download_path"
         private const val KEY_BILIBILI_COOKIE = "key_bilibili_cookie"
+        private const val KEY_X_COOKIE = "key_x_cookie"
         private const val KEY_HAS_PROMPTED_BILIBILI_LOGIN = "key_has_prompted_bilibili_login"
         private const val KEY_APP_LANGUAGE = "key_app_language"
         private const val KEY_THEME_MODE = "key_theme_mode"

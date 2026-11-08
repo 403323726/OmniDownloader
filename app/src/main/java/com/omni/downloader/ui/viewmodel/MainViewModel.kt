@@ -61,6 +61,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setThemeMode(mode: String) = settingsRepository.setThemeMode(mode)
     val bilibiliCookie: StateFlow<String> = settingsRepository.bilibiliCookie
+    val xCookie: StateFlow<String> = settingsRepository.xCookie
     val hasPromptedBilibiliLogin: StateFlow<Boolean> = settingsRepository.hasPromptedBilibiliLogin
     val hasShownRelayCompatTip: StateFlow<Boolean> = settingsRepository.hasShownRelayCompatTip
     val relaySites: StateFlow<List<RelaySite>> = settingsRepository.relaySites
@@ -91,6 +92,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearBilibiliCookie() {
         settingsRepository.clearBilibiliCookie()
+    }
+
+    fun updateXCookie(cookie: String) {
+        settingsRepository.setXCookie(cookie)
+    }
+
+    fun clearXCookie() {
+        settingsRepository.clearXCookie()
     }
 
     private val _inputUrl = MutableStateFlow("")

@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CleaningServices
@@ -118,6 +119,10 @@ fun SettingsScreen(
     val savedBilibiliCookie by viewModel.bilibiliCookie.collectAsStateWithLifecycle()
     var bilibiliCookieInput by remember(savedBilibiliCookie) { mutableStateOf(savedBilibiliCookie) }
     var showBilibiliLoginSheet by remember { mutableStateOf(false) }
+
+    val savedXCookie by viewModel.xCookie.collectAsStateWithLifecycle()
+    var xCookieInput by remember(savedXCookie) { mutableStateOf(savedXCookie) }
+    var showXLoginSheet by remember { mutableStateOf(false) }
 
     val savedDownloadPath by viewModel.downloadPath.collectAsStateWithLifecycle()
     var showPathDialog by remember { mutableStateOf(false) }
@@ -509,6 +514,113 @@ fun SettingsScreen(
                         }
                     }
 
+                    item(key = "settings_x_header") {
+                        OmniSectionHeader(title = strings.xCookieSection)
+                    }
+                    item(key = "settings_x_card") {
+                        OmniCard {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OmniIconBox(icon = Icons.Outlined.AlternateEmail, size = 36, corner = 10)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = strings.xCookieHint,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    if (savedXCookie.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = strings.xCookieActive,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = statusColors.success
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { showXLoginSheet = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(42.dp),
+
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.AlternateEmail,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(strings.xAutoLoginBtn, style = MaterialTheme.typography.labelLarge)
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = xCookieInput,
+                                onValueChange = { xCookieInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = false,
+                                minLines = 2,
+                                maxLines = 3,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                placeholder = {
+                                    Text(
+                                        text = strings.xCookiePlaceholder,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                if (savedXCookie.isNotEmpty()) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            xCookieInput = ""
+                                            viewModel.clearXCookie()
+                                            Toast.makeText(context, strings.xCookieCleared, Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.height(36.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp),
+
+                                    ) {
+                                        Text(strings.clearXCookie, style = MaterialTheme.typography.labelLarge)
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Button(
+                                    onClick = {
+                                        val cleanX = xCookieInput.trim()
+                                        if (cleanX.isNotEmpty() && !com.omni.downloader.engine.XCookieSupport.hasUsableCookie(cleanX)) {
+                                            Toast.makeText(context, strings.xCookieInvalid, Toast.LENGTH_LONG).show()
+                                        } else {
+                                            viewModel.updateXCookie(cleanX)
+                                            Toast.makeText(context, strings.xCookieSaved, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.height(36.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp),
+
+                                ) {
+                                    Text(strings.applyXCookie, style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                    }
+
 
                 }
 
@@ -785,6 +897,20 @@ fun SettingsScreen(
                 viewModel.updateBilibiliCookie(capturedCookie)
                 bilibiliCookieInput = capturedCookie
                 Toast.makeText(context, strings.bilibiliLoginSuccess, Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    if (tabActive && showXLoginSheet) {
+        com.omni.downloader.ui.components.XLoginSheet(
+            onDismissRequest = {
+                showXLoginSheet = false
+            },
+            onCookieCaptured = { capturedCookie ->
+                showXLoginSheet = false
+                viewModel.updateXCookie(capturedCookie)
+                xCookieInput = capturedCookie
+                Toast.makeText(context, strings.xLoginSuccess, Toast.LENGTH_LONG).show()
             }
         )
     }

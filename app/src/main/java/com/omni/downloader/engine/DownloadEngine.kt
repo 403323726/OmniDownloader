@@ -159,6 +159,16 @@ object DownloadEngine {
 
         try {
             val isXPlatform = site == "X (Twitter)"
+            // X 平台：有登录凭证时走已登录通道，否则保持游客身份
+            val xCookieFile = if (isXPlatform) {
+                try {
+                    XCookieSupport.prepareCookieFile(context)
+                } catch (e: XCookieSupport.InvalidCookieException) {
+                    return@withContext Result.failure(Exception(e.message))
+                }
+            } else {
+                null
+            }
             val request = YoutubeDLRequest(cleanUrl).apply {
                 addOption("-J") // 完整 JSON 输出模式（支持单视频与多视频推文 Playlist）
                 if (!isXPlatform) {
@@ -184,6 +194,8 @@ object DownloadEngine {
                     }
                     "X (Twitter)" -> {
                         addOption("--add-header", "User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15")
+                        // 已登录凭证：X 对游客返回 TweetTombstone，登录后才能拿到敏感/受保护推文
+                        xCookieFile?.let { addOption("--cookies", it.absolutePath) }
                     }
                     "TikTok" -> {
                         // 使用 yt-dlp 自身内置的真实客户端指纹，避免被 TikTok WAF 强校验拦截
@@ -479,6 +491,16 @@ object DownloadEngine {
         }
 
         try {
+            // X 平台：与解析阶段保持同一套登录凭证
+            val xCookieFile = if (site == "X (Twitter)") {
+                try {
+                    XCookieSupport.prepareCookieFile(context)
+                } catch (e: XCookieSupport.InvalidCookieException) {
+                    return@withContext Result.failure(Exception(e.message))
+                }
+            } else {
+                null
+            }
             val request = YoutubeDLRequest(cleanUrl).apply {
                 addOption("-o", "${stagingDir.absolutePath}/%(title).50s-%(id).30s.%(ext)s")
                 addOption("--no-playlist")
@@ -507,6 +529,8 @@ object DownloadEngine {
                     }
                     "X (Twitter)" -> {
                         addOption("--add-header", "User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15")
+                        // 与解析阶段一致：登录态下载，避免 403 / 空文件
+                        xCookieFile?.let { addOption("--cookies", it.absolutePath) }
                     }
                     "TikTok" -> {
                         // 使用 yt-dlp 自身内置的真实客户端指纹，避免被 TikTok WAF 强校验拦截
