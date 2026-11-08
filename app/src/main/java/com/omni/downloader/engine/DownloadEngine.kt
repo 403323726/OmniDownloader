@@ -607,11 +607,7 @@ object DownloadEngine {
                     // 画面与音轨是两条流：画面走 0→90，音轨走 90→99，
                     // 避免第二条流开始时进度条从 100% 掉回 0%，看起来像整片重下。
                     val isAudioStage = streamCount >= 2
-                    val rawProgress = when {
-                        isAudioStage -> 90f + stageProgress * 0.09f
-                        expectsSeparateAudio -> stageProgress * 0.9f
-                        else -> stageProgress
-                    }
+                    val rawProgress = stagedProgress(stageProgress, isAudioStage, expectsSeparateAudio)
                     // 合并阶段 yt-dlp 可能回报 0%，进度条只前进不后退
                     val displayProgress = maxOf(rawProgress, maxReportedProgress).coerceIn(0f, 100f)
                     maxReportedProgress = displayProgress
@@ -627,10 +623,7 @@ object DownloadEngine {
                     }
 
                     // 处理阶段分两种文案：真正在合并音视频轨，还是仅封装/搬运文件
-                    val etaStr = when {
-                        sawMerge -> "正在合并音视频轨…"
-                        isAudioStage -> "正在下载音轨"
-                        currentStatus == TaskStatus.PROCESSING -> "正在保存文件…"
+                    val etaStr = processingStageLabel(isAudioStage, sawMerge, currentStatus) ?: when {
                         etaInSeconds > 0 -> {
                             val m = etaInSeconds / 60
                             val s = etaInSeconds % 60
@@ -1539,6 +1532,35 @@ object DownloadEngine {
             cause = cause.cause!!
         }
         return cause
+    }
+
+    /**
+     * 处理阶段的说明文案。返回 null 表示还在正常下载，由调用方显示剩余时间。
+     * 抽出成纯函数是为了让「合并 / 音轨 / 保存」三种状态可以被单测钉死。
+     */
+    internal fun processingStageLabel(
+        isAudioStage: Boolean,
+        sawMerge: Boolean,
+        status: TaskStatus
+    ): String? = when {
+        sawMerge -> "正在合并音视频轨…"
+        isAudioStage -> "正在下载音轨"
+        status == TaskStatus.PROCESSING -> "正在保存文件…"
+        else -> null
+    }
+
+    /** 分段进度：画面 0→90，独立音轨 90→99，单流保持原始百分比。 */
+    internal fun stagedProgress(
+        progress: Float,
+        isAudioStage: Boolean,
+        expectsSeparateAudio: Boolean
+    ): Float {
+        val p = progress.coerceIn(0f, 100f)
+        return when {
+            isAudioStage -> 90f + p * 0.09f
+            expectsSeparateAudio -> p * 0.9f
+            else -> p
+        }
     }
 
     /** 内置伪 id：解析失败时的兜底列表，并不是真实的 format_id，不能直接传给 -f。 */
