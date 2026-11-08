@@ -617,7 +617,10 @@ object DownloadEngine {
                     maxReportedProgress = displayProgress
 
                     val speed = parseSpeedFromLine(line)
+                    // [Merger] 那一行常常带 0% 进度，必须以「已开始合并」为准，
+                    // 否则会被判成仍在下载，合并文案就不出现了。
                     val currentStatus = when {
+                        sawMerge -> TaskStatus.PROCESSING
                         isAudioStage -> TaskStatus.PROCESSING
                         stageProgress >= 99.5f -> TaskStatus.PROCESSING
                         else -> TaskStatus.DOWNLOADING
@@ -625,9 +628,9 @@ object DownloadEngine {
 
                     // 处理阶段分两种文案：真正在合并音视频轨，还是仅封装/搬运文件
                     val etaStr = when {
+                        sawMerge -> "正在合并音视频轨…"
                         isAudioStage -> "正在下载音轨"
-                        currentStatus == TaskStatus.PROCESSING ->
-                            if (sawMerge) "正在合并音视频轨…" else "正在保存文件…"
+                        currentStatus == TaskStatus.PROCESSING -> "正在保存文件…"
                         etaInSeconds > 0 -> {
                             val m = etaInSeconds / 60
                             val s = etaInSeconds % 60

@@ -503,8 +503,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteTask(taskId: String, deleteFile: Boolean) {
+        val target = repository.getTask(taskId)
+        val sharedPath = target?.localFilePath.orEmpty()
+        // 同一文件被多条记录引用时，仓库会保留文件；提示语要如实反映
+        val fileShared = sharedPath.isNotEmpty() &&
+            repository.tasks.value.any { it.id != taskId && it.localFilePath == sharedPath }
         repository.removeTask(taskId, deleteFile)
-        _message.value = if (deleteFile) "已删除记录与本地文件" else "已从列表移除"
+        _message.value = when {
+            !deleteFile -> "已从列表移除"
+            fileShared -> "已删除记录；文件仍被其他任务使用，已保留"
+            else -> "已删除记录与本地文件"
+        }
     }
 
     /**
