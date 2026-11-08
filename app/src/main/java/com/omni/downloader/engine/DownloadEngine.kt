@@ -617,8 +617,11 @@ object DownloadEngine {
                         else -> TaskStatus.DOWNLOADING
                     }
 
+                    // 处理阶段（合并/封装）的文案由 UI 用自身默认文案补位，
+                    // 这里必须留空，否则「剩余 1秒」会把「正在合并音视频轨…」顶掉。
                     val etaStr = when {
                         isAudioStage -> "正在下载音轨"
+                        currentStatus == TaskStatus.PROCESSING -> ""
                         etaInSeconds > 0 -> {
                             val m = etaInSeconds / 60
                             val s = etaInSeconds % 60
